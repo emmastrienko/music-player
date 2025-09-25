@@ -27,6 +27,11 @@ export const store = configureStore({
     getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        warnAfter: 128,
+      },
+      immutableCheck: {
+        // Disable for better performance in development
+        warnAfter: 128,
       },
     }),
 });

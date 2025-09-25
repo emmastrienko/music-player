@@ -13,7 +13,7 @@ import {useSelector, useDispatch} from 'react-redux';
 import {useNavigation} from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import {setLocalSongs, createPlaylist} from '../../redux/slices/musicSlice';
-import {localMusicService} from '../../services/localMusicService';
+import {loadLocalMusic} from '../../redux/actions/musicActions';
 import SongCard from '../../components/music/SongCard';
 import PlaylistCard from '../../components/music/PlaylistCard';
 import Header from '../../components/common/Header';
@@ -21,6 +21,8 @@ import Button from '../../components/common/Button';
 import {colors} from '../../styles/colors';
 import {typography} from '../../styles/typography';
 import {globalStyles} from '../../styles/globalStyles';
+import {localMusicService} from '../../services/localMusicService';
+import {audioService} from '../../services/audioService';
 
 const LibraryScreen = () => {
   const navigation = useNavigation();
@@ -34,20 +36,98 @@ const LibraryScreen = () => {
 
   const [selectedTab, setSelectedTab] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
-    loadLocalMusic();
+    loadLocalMusicFiles();
   }, []);
 
-  const loadLocalMusic = async () => {
+  const loadLocalMusicFiles = async () => {
     setIsLoading(true);
     try {
-      const songs = await localMusicService.scanLocalMusic();
-      dispatch(setLocalSongs(songs));
+      console.log('=== DEBUG: Starting local music load ===');
+      const result = await dispatch(loadLocalMusic()).unwrap();
+      console.log('Local music loaded successfully:', {
+        count: result?.length || 0,
+        firstSong: result?.[0] ? {
+          title: result[0].title,
+          url: result[0].url,
+          isLocal: result[0].isLocal
+        } : null
+      });
     } catch (error) {
       console.error('Error loading local music:', error);
+      
+      // Determine the type of error and show appropriate message
+      let title = 'Error Loading Local Music';
+      let message = 'Unable to load local music files.';
+      
+      if (error.message && error.message.includes('permission')) {
+        title = 'Permission Required';
+        message = 'To play local music, please grant access to your media library in device settings.';
+      } else if (error.message && error.message.includes('No audio files found')) {
+        title = 'No Music Found';
+        message = 'No audio files were found on your device. Please add some music files and try again.';
+      } else {
+        message = `Error: ${error.message || 'Unknown error occurred'}`;
+      }
+      
+      // Show user-friendly error message
+      Alert.alert(
+        title,
+        message,
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {text: 'Try Again', onPress: loadLocalMusicFiles},
+        ]
+      );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const testLocalMusicDirect = async () => {
+    setDebugInfo('Starting direct test...');
+    try {
+      // Test permissions
+      const hasPermission = await localMusicService.requestPermissions();
+      setDebugInfo(prev => prev + `\nPermissions: ${hasPermission ? 'GRANTED' : 'DENIED'}`);
+      
+      if (!hasPermission) {
+        Alert.alert('Permission Denied', 'Please grant media library access in device settings');
+        return;
+      }
+      
+      // Test scanning
+      const songs = await localMusicService.scanLocalMusic();
+      setDebugInfo(prev => prev + `\nFound ${songs.length} songs`);
+      
+      if (songs.length > 0) {
+        const firstSong = songs[0];
+        setDebugInfo(prev => prev + `\nFirst song: ${firstSong.title}`);
+        setDebugInfo(prev => prev + `\nURI: ${firstSong.url}`);
+        
+        // Test audio loading
+        try {
+          const result = await audioService.loadTrack(firstSong);
+          setDebugInfo(prev => prev + `\nAudio load: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+          
+          if (result.success) {
+            const playResult = await audioService.play();
+            setDebugInfo(prev => prev + `\nPlayback: ${playResult.success ? 'STARTED' : 'FAILED'}`);
+            
+            // Stop after 3 seconds
+            setTimeout(async () => {
+              await audioService.stop();
+              setDebugInfo(prev => prev + `\nPlayback stopped`);
+            }, 3000);
+          }
+        } catch (audioError) {
+          setDebugInfo(prev => prev + `\nAudio error: ${audioError.message}`);
+        }
+      }
+    } catch (error) {
+      setDebugInfo(prev => prev + `\nError: ${error.message}`);
     }
   };
 
@@ -101,7 +181,7 @@ const LibraryScreen = () => {
           styles.tabCount,
           selectedTab === tab.key && styles.activeTabCount,
         ]}>
-        {tab.count}
+        {String(tab.count || 0)}
       </Text>
     </TouchableOpacity>
   );
@@ -144,6 +224,14 @@ const LibraryScreen = () => {
             icon="add"
           />
           
+          {/* Debug button - remove in production */}
+          <Button
+            title="Debug Local Music"
+            onPress={testLocalMusicDirect}
+            style={[styles.createButton, {backgroundColor: colors.error, marginTop: 10}]}
+            icon="bug"
+          />
+          
           <FlatList
             data={data}
             renderItem={renderPlaylistItem}
@@ -163,7 +251,7 @@ const LibraryScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         refreshing={isLoading}
-        onRefresh={loadLocalMusic}
+        onRefresh={loadLocalMusicFiles}
       />
     );
   };
@@ -251,6 +339,32 @@ const styles = StyleSheet.create({
   },
   createButton: {
     margin: 16,
+  },
+  debugContainer: {
+    backgroundColor: colors.backgroundSecondary,
+    margin: 16,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
+  debugText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontFamily: 'monospace',
+  },
+  clearButton: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    backgroundColor: colors.error,
+    borderRadius: 4,
+  },
+  clearButtonText: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    fontWeight: 'bold',
   },
 });
 

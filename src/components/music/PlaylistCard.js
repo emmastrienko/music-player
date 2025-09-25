@@ -47,11 +47,11 @@ const PlaylistCard = ({playlist}) => {
 
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={2}>
-          {playlist.name}
+          {String(playlist.name || 'Untitled Playlist')}
         </Text>
         
         <Text style={styles.songCount} numberOfLines={1}>
-          {playlist.songs?.length || 0} song{playlist.songs?.length !== 1 ? 's' : ''}
+          {String(playlist.songs?.length || 0)} song{playlist.songs?.length !== 1 ? 's' : ''}
         </Text>
         
         {playlist.createdAt && (

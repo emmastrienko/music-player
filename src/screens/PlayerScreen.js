@@ -78,12 +78,24 @@ const PlayerScreen = () => {
       if (currentTrack && currentTrack !== audioService.getCurrentTrack()) {
         setIsLoading(true);
         try {
+          console.log(`PlayerScreen: Loading track ${currentTrack.title}`);
           const result = await audioService.loadTrack(currentTrack);
           dispatch(setDuration(Math.floor(result.duration / 1000))); // Convert to seconds
           dispatch(setPosition(0)); // Reset position
-          console.log("Track loaded successfully:", currentTrack.title);
+          console.log(`✅ PlayerScreen: Track loaded successfully: ${currentTrack.title}`);
+          
+          // If we're supposed to be playing, start playback
+          if (isPlaying) {
+            console.log(`PlayerScreen: Auto-starting playback for ${currentTrack.title}`);
+            const playResult = await audioService.play();
+            if (!playResult.success) {
+              console.warn(`❌ PlayerScreen: Failed to start auto-playback`);
+              dispatch(setIsPlaying(false));
+            }
+          }
         } catch (error) {
-          console.error("Error loading track:", error);
+          console.error(`❌ PlayerScreen: Error loading track: ${error.message}`);
+          dispatch(setIsPlaying(false));
         } finally {
           setIsLoading(false);
         }
@@ -91,7 +103,37 @@ const PlayerScreen = () => {
     };
 
     loadTrack();
-  }, [currentTrack, dispatch]);
+  }, [currentTrack, dispatch]); // Remove isPlaying from deps to avoid loop
+
+  // Handle play/pause state changes (when track is already loaded)
+  useEffect(() => {
+    const handlePlayStateChange = async () => {
+      if (currentTrack && audioService.getCurrentTrack()?.id === currentTrack.id && !isLoading) {
+        try {
+          if (isPlaying && !audioService.isTrackLoaded()) {
+            // Track not loaded yet, let the track loading useEffect handle it
+            return;
+          }
+          
+          if (isPlaying) {
+            console.log(`PlayerScreen: Starting playback for ${currentTrack.title}`);
+            const playResult = await audioService.play();
+            if (!playResult.success) {
+              console.warn(`❌ PlayerScreen: Failed to start playback`);
+              dispatch(setIsPlaying(false));
+            }
+          } else {
+            console.log(`PlayerScreen: Pausing playback for ${currentTrack.title}`);
+            await audioService.pause();
+          }
+        } catch (error) {
+          console.error(`❌ PlayerScreen: Error handling play state change: ${error.message}`);
+        }
+      }
+    };
+
+    handlePlayStateChange();
+  }, [isPlaying, currentTrack, isLoading, dispatch]);
 
   // Handle artwork animation
   useEffect(() => {

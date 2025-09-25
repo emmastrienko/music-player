@@ -36,48 +36,129 @@ class AudioService {
 
       console.log(`Loading track: ${track.title}`);
       
-      // Option 1: Use actual audio URLs if available
-      let audioUri = track.previewUrl;
+      // Determine the correct audio URL to use
+      let audioUri;
       
-      // Option 2: Use free sample audio files for testing
-      if (!audioUri) {
-        // These are actual working audio URLs for testing
-        const sampleAudios = [
-          'https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3',
-          'https://sample-music.netlify.app/death%20bed.mp3',
-          'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3',
-          'https://codeskulptor-demos.commondatastorage.googleapis.com/descent/background%20music.mp3',
-          'https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/theme_01.mp3',
-        ];
+      console.log(`Track data for ${track.title}:`, {
+        isLocal: track.isLocal,
+        url: track.url,
+        previewUrl: track.previewUrl,
+        localUri: track.localUri,
+        uri: track.uri
+      });
+      
+      if (track.isLocal === true && (track.url || track.localUri || track.uri)) {
+        // For local files, try multiple URL properties
+        audioUri = track.url || track.localUri || track.uri;
+        console.log(`Using local file: ${audioUri}`);
         
-        // Use a different sample for each track
-        const trackIndex = parseInt(track.id.replace(/\D/g, '')) || 0;
-        audioUri = sampleAudios[trackIndex % sampleAudios.length];
+        // Validate and normalize local file URL format
+        if (!audioUri) {
+          console.warn(`No URI found for local file`);
+          throw new Error(`No URI found for local file`);
+        }
+        
+        // Normalize local file URI - ensure it starts with file:// for local files
+        if (!audioUri.startsWith('file://') && !audioUri.startsWith('content://')) {
+          if (audioUri.startsWith('/')) {
+            audioUri = 'file://' + audioUri;
+            console.log(`Normalized local URI to: ${audioUri}`);
+          } else {
+            console.warn(`Invalid local file URL format: ${audioUri}`);
+            throw new Error(`Invalid local file URL: ${audioUri}`);
+          }
+        }
+      } else if (track.previewUrl && !track.previewUrl.includes('music.apple.com')) {
+        // For iTunes songs, use the preview URL
+        audioUri = track.previewUrl;
+        console.log(`Using iTunes preview: ${audioUri}`);
+      } else {
+        // Log missing URL info and use fallback
+        console.warn(`No valid audio URL found for ${track.title}:`, {
+          isLocal: track.isLocal,
+          hasUrl: !!track.url,
+          hasPreviewUrl: !!track.previewUrl,
+          hasLocalUri: !!track.localUri,
+          hasUri: !!track.uri,
+          urlType: track.url ? (track.url.includes('music.apple.com') ? 'website_link' : 'audio_file') : 'none'
+        });
+        
+        // Try to fetch a working preview URL using iTunes Search API
+        if (track.isLocal !== true && track.title && track.artist) {
+          console.log(`Attempting to fetch working preview URL for: ${track.title} by ${track.artist}`);
+          try {
+            // Search iTunes for this specific track to get preview URL
+            const searchResponse = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(track.title + ' ' + track.artist)}&media=music&entity=song&limit=1`);
+            const searchData = await searchResponse.json();
+            
+            if (searchData.results && searchData.results.length > 0 && searchData.results[0].previewUrl) {
+              audioUri = searchData.results[0].previewUrl;
+              console.log(`✅ Found working preview URL: ${audioUri}`);
+            } else {
+              throw new Error('No preview URL in search results');
+            }
+          } catch (error) {
+            console.log(`❌ Could not fetch preview URL: ${error.message}`);
+            audioUri = 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3';
+            console.log(`Using fallback audio for: ${track.title}`);
+          }
+        } else {
+          audioUri = 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3';
+          console.log(`Using fallback audio for: ${track.title}`);
+        }
       }
       
       console.log(`Audio URI: ${audioUri}`);
       
       // Create new sound object
+      console.log(`Attempting to create sound with URI: ${audioUri}`);
       const { sound, status } = await Audio.Sound.createAsync(
         { uri: audioUri },
         { shouldPlay: false, isLooping: false },
         this.onPlaybackStatusUpdate.bind(this)
       );
 
+      console.log(`Sound creation status:`, {
+        isLoaded: status.isLoaded,
+        error: status.error,
+        durationMillis: status.durationMillis
+      });
+
+      if (!status.isLoaded) {
+        console.error('❌ Sound failed to load:', status.error);
+        throw new Error(`Failed to load audio: ${status.error || 'Unknown error'}`);
+      }
+
       this.sound = sound;
       this.currentTrack = track;
       this.isLoaded = status.isLoaded;
       this.duration = status.durationMillis || (track.duration * 1000);
 
-      console.log(`Track loaded successfully: ${track.title}, Duration: ${this.duration}ms`);
+      console.log(`✅ Track loaded successfully: ${track.title}, Duration: ${this.duration}ms`);
       return { success: true, duration: this.duration };
     } catch (error) {
-      console.warn('Error loading track:', error);
-      // Fallback: simulate loading success for demo
+      console.error('❌ Error loading track:', error);
+      
+      // For local files, don't fall back to simulation - report the actual error
+      if (track.isLocal) {
+        console.error(`❌ Local file playback failed for: ${track.title}`);
+        console.error('Error details:', {
+          message: error.message,
+          track: {
+            title: track.title,
+            url: track.url,
+            localUri: track.localUri,
+            uri: track.uri
+          }
+        });
+        throw new Error(`Local file playback failed: ${error.message}`);
+      }
+      
+      // Fallback: simulate loading success for online tracks only
       this.currentTrack = track;
       this.isLoaded = true;
       this.duration = (track.duration || 180) * 1000;
-      console.log(`Using simulated playback for: ${track.title}`);
+      console.log(`Using simulated playback for online track: ${track.title}`);
       return { success: true, duration: this.duration };
     }
   }

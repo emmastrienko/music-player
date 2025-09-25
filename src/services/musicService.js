@@ -2,53 +2,153 @@
 import api from './api';
 
 class MusicService {
-  // Return mock data for demo purposes - iTunes API often has CORS issues
+  // Fetch real music from iTunes API with multiple search terms for better results
   async getPopularSongs(limit = 50) {
     try {
-      console.log('Loading popular songs from mock data');
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return {data: this.getMockSongs()};
+      console.log('Fetching popular songs from iTunes API');
+      
+      // Try multiple search terms to get diverse popular music
+      const searchTerms = [
+        'pop music 2024',
+        'trending songs',
+        'billboard hits',
+        'top charts',
+        'popular music'
+      ];
+      
+      let allSongs = [];
+      const songsPerTerm = Math.ceil(limit / searchTerms.length);
+      
+      for (const term of searchTerms) {
+        try {
+          const response = await api.get('https://itunes.apple.com/search', {
+            params: {
+              term: term,
+              country: 'US',
+              media: 'music',
+              entity: 'song',
+              limit: songsPerTerm,
+            },
+          });
+
+          const songs = response.data.results.map((song, index) => {
+            const trackData = {
+              id: song.trackId || `itunes_${term}_${index}`,
+              title: song.trackName,
+              artist: song.artistName,
+              album: song.collectionName,
+              duration: Math.floor(song.trackTimeMillis / 1000) || 180,
+              artwork: song.artworkUrl100?.replace('100x100', '600x600') || song.artworkUrl60?.replace('60x60', '600x600'),
+              previewUrl: song.previewUrl, // 30-second preview from iTunes
+              genre: song.primaryGenreName,
+              releaseDate: song.releaseDate,
+              price: song.trackPrice,
+              currency: song.currency,
+              isLocal: false,
+              isFavorite: false,
+            };
+            
+            console.log(`iTunes song processed: ${trackData.title}`, {
+              hasPreviewUrl: !!trackData.previewUrl,
+              previewUrl: trackData.previewUrl
+            });
+            
+            return trackData;
+          });
+
+          allSongs = [...allSongs, ...songs];
+        } catch (termError) {
+          console.warn(`Failed to fetch songs for term "${term}":`, termError.message);
+        }
+      }
+
+      // Remove duplicates based on trackId
+      const uniqueSongs = allSongs.filter((song, index, self) => 
+        index === self.findIndex(s => s.id === song.id)
+      );
+
+      // Limit to requested number
+      const finalSongs = uniqueSongs.slice(0, limit);
+      
+      console.log(`Loaded ${finalSongs.length} real songs from iTunes`);
+      return {data: finalSongs};
     } catch (error) {
-      console.error('Error fetching popular songs:', error);
-      return {data: this.getMockSongs()};
+      console.error('Error fetching from iTunes API:', error);
+      // Return empty array instead of mock data - let user know API is unavailable
+      return {data: []};
     }
   }
 
   async searchSongs(query, limit = 30) {
     try {
-      console.log(`Searching for: ${query}`);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
+      console.log(`Searching iTunes for: ${query}`);
       
-      // Filter mock songs based on query
-      const allSongs = this.getMockSongs();
-      const filteredSongs = allSongs.filter(song => 
-        song.title.toLowerCase().includes(query.toLowerCase()) ||
-        song.artist.toLowerCase().includes(query.toLowerCase()) ||
-        song.album.toLowerCase().includes(query.toLowerCase())
-      );
-      
-      return {data: filteredSongs.slice(0, limit)};
+      const response = await api.get('https://itunes.apple.com/search', {
+        params: {
+          term: query,
+          country: 'US',
+          media: 'music',
+          entity: 'song',
+          limit: limit,
+        },
+      });
+
+      const songs = response.data.results.map((song, index) => ({
+        id: song.trackId || `search_${index}`,
+        title: song.trackName,
+        artist: song.artistName,
+        album: song.collectionName,
+        duration: Math.floor(song.trackTimeMillis / 1000) || 180,
+        artwork: song.artworkUrl100?.replace('100x100', '600x600') || song.artworkUrl60?.replace('60x60', '600x600'),
+        previewUrl: song.previewUrl, // Real 30-second previews
+        genre: song.primaryGenreName,
+        releaseDate: song.releaseDate,
+        price: song.trackPrice,
+        currency: song.currency,
+        isLocal: false,
+        isFavorite: false,
+      }));
+
+      console.log(`Found ${songs.length} songs for "${query}"`);
+      return {data: songs};
     } catch (error) {
-      console.error('Error searching songs:', error);
+      console.error('Error searching iTunes:', error);
       return {data: []};
     }
   }
 
   async getSongsByGenre(genre, limit = 30) {
     try {
-      console.log(`Loading songs for genre: ${genre}`);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
+      console.log(`Searching iTunes for genre: ${genre}`);
       
-      // Filter mock songs by genre
-      const allSongs = this.getMockSongs();
-      const filteredSongs = allSongs.filter(song => 
-        song.genre.toLowerCase().includes(genre.toLowerCase())
-      );
-      
-      return {data: filteredSongs.slice(0, limit)};
+      const response = await api.get('https://itunes.apple.com/search', {
+        params: {
+          term: `${genre} music`,
+          country: 'US',
+          media: 'music',
+          entity: 'song',
+          limit: limit,
+        },
+      });
+
+      const songs = response.data.results.map((song, index) => ({
+        id: song.trackId || `genre_${index}`,
+        title: song.trackName,
+        artist: song.artistName,
+        album: song.collectionName,
+        duration: Math.floor(song.trackTimeMillis / 1000) || 180,
+        artwork: song.artworkUrl100?.replace('100x100', '600x600') || song.artworkUrl60?.replace('60x60', '600x600'),
+        previewUrl: song.previewUrl,
+        genre: song.primaryGenreName,
+        releaseDate: song.releaseDate,
+        price: song.trackPrice,
+        currency: song.currency,
+        isLocal: false,
+        isFavorite: false,
+      }));
+
+      console.log(`Found ${songs.length} songs for genre "${genre}"`);
+      return {data: songs};
     } catch (error) {
       console.error('Error fetching songs by genre:', error);
       return {data: []};
@@ -57,157 +157,87 @@ class MusicService {
 
   async getArtistSongs(artistName, limit = 30) {
     try {
-      console.log(`Loading songs for artist: ${artistName}`);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
+      console.log(`Searching iTunes for artist: ${artistName}`);
       
-      // Filter mock songs by artist
-      const allSongs = this.getMockSongs();
-      const filteredSongs = allSongs.filter(song => 
-        song.artist.toLowerCase().includes(artistName.toLowerCase())
-      );
-      
-      return {data: filteredSongs.slice(0, limit)};
+      const response = await api.get('https://itunes.apple.com/search', {
+        params: {
+          term: artistName,
+          country: 'US',
+          media: 'music',
+          entity: 'song',
+          attribute: 'artistTerm',
+          limit: limit,
+        },
+      });
+
+      const songs = response.data.results.map((song, index) => ({
+        id: song.trackId || `artist_${index}`,
+        title: song.trackName,
+        artist: song.artistName,
+        album: song.collectionName,
+        duration: Math.floor(song.trackTimeMillis / 1000) || 180,
+        artwork: song.artworkUrl100?.replace('100x100', '600x600') || song.artworkUrl60?.replace('60x60', '600x600'),
+        previewUrl: song.previewUrl,
+        genre: song.primaryGenreName,
+        releaseDate: song.releaseDate,
+        price: song.trackPrice,
+        currency: song.currency,
+        isLocal: false,
+        isFavorite: false,
+      }));
+
+      console.log(`Found ${songs.length} songs for artist "${artistName}"`);
+      return {data: songs};
     } catch (error) {
       console.error('Error fetching artist songs:', error);
       return {data: []};
     }
   }
 
-  // Mock data for offline mode or API failures
-  getMockSongs() {
-    return [
-      {
-        id: 'mock_1',
-        title: 'Blinding Lights',
-        artist: 'The Weeknd',
-        album: 'After Hours',
-        duration: 200,
-        artwork: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=300&fit=crop',
-        previewUrl: 'https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3',
-        genre: 'Pop',
-        releaseDate: '2020-03-20',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_2',
-        title: 'Watermelon Sugar',
-        artist: 'Harry Styles',
-        album: 'Fine Line',
-        duration: 174,
-        artwork: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&h=300&fit=crop',
-        previewUrl: 'https://codeskulptor-demos.commondatastorage.googleapis.com/descent/background%20music.mp3',
-        genre: 'Pop',
-        releaseDate: '2020-05-15',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_3',
-        title: 'Levitating',
-        artist: 'Dua Lipa',
-        album: 'Future Nostalgia',
-        duration: 203,
-        artwork: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=300&fit=crop',
-        previewUrl: 'https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/theme_01.mp3',
-        genre: 'Pop',
-        releaseDate: '2020-03-27',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_4',
-        title: 'Stay',
-        artist: 'The Kid LAROI, Justin Bieber',
-        album: 'F*CK LOVE 3',
-        duration: 141,
-        artwork: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=300&fit=crop',
-        previewUrl: null,
-        genre: 'Pop',
-        releaseDate: '2021-07-09',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_5',
-        title: 'Good 4 U',
-        artist: 'Olivia Rodrigo',
-        album: 'SOUR',
-        duration: 178,
-        artwork: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&h=300&fit=crop',
-        previewUrl: null,
-        genre: 'Pop',
-        releaseDate: '2021-05-14',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_6',
-        title: 'Heat Waves',
-        artist: 'Glass Animals',
-        album: 'Dreamland',
-        duration: 238,
-        artwork: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=300&fit=crop&sat=2',
-        previewUrl: null,
-        genre: 'Alternative',
-        releaseDate: '2020-06-29',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_7',
-        title: 'As It Was',
-        artist: 'Harry Styles',
-        album: 'Harrys House',
-        duration: 167,
-        artwork: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=300&fit=crop&hue=180',
-        previewUrl: null,
-        genre: 'Pop',
-        releaseDate: '2022-04-01',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_8',
-        title: 'Industry Baby',
-        artist: 'Lil Nas X, Jack Harlow',
-        album: 'MONTERO',
-        duration: 212,
-        artwork: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=300&h=300&fit=crop&hue=60',
-        previewUrl: null,
-        genre: 'Hip-Hop',
-        releaseDate: '2021-07-23',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_9',
-        title: 'Bad Habits',
-        artist: 'Ed Sheeran',
-        album: '=',
-        duration: 231,
-        artwork: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=300&fit=crop&hue=120',
-        previewUrl: null,
-        genre: 'Pop',
-        releaseDate: '2021-06-25',
-        isLocal: false,
-        isFavorite: false,
-      },
-      {
-        id: 'mock_10',
-        title: 'Peaches',
-        artist: 'Justin Bieber ft. Daniel Caesar, Giveon',
-        album: 'Justice',
-        duration: 198,
-        artwork: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&h=300&fit=crop&hue=240',
-        previewUrl: null,
-        genre: 'R&B',
-        releaseDate: '2021-03-19',
-        isLocal: false,
-        isFavorite: false,
-      },
-    ];
+  // Get trending songs from iTunes RSS feeds (more reliable)
+  async getTrendingSongs(limit = 50) {
+    try {
+      console.log('Fetching trending songs from iTunes RSS');
+      
+      // iTunes RSS feed for top songs
+      const response = await api.get('https://rss.applemarketingtools.com/api/v2/us/music/most-played/50/songs.json');
+      
+      if (response.data && response.data.feed && response.data.feed.results) {
+        const songs = response.data.feed.results.slice(0, limit).map((song, index) => {
+          const trackData = {
+            id: song.id || `trending_${index}`,
+            title: song.name,
+            artist: song.artistName,
+            album: song.collectionName || 'Single',
+            duration: 180, // RSS doesn't include duration
+            artwork: song.artworkUrl100 || null,
+            previewUrl: song.previewUrl || null,
+            genre: song.genres?.[0]?.name || 'Music',
+            releaseDate: song.releaseDate,
+            url: song.url,
+            isLocal: false,
+            isFavorite: false,
+          };
+          
+          console.log(`RSS song processed: ${trackData.title}`, {
+            hasPreviewUrl: !!trackData.previewUrl,
+            hasUrl: !!trackData.url,
+            previewUrl: trackData.previewUrl
+          });
+          
+          return trackData;
+        });
+
+        console.log(`Loaded ${songs.length} trending songs from iTunes RSS`);
+        return {data: songs};
+      }
+      
+      throw new Error('Invalid RSS response structure');
+    } catch (error) {
+      console.error('Error fetching from iTunes RSS:', error);
+      // Fallback to search API
+      return this.getPopularSongs(limit);
+    }
   }
 }
 

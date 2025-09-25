@@ -54,17 +54,17 @@ const MiniPlayer = () => {
           <Image
             source={{
               uri:
-                currentTrack.artwork ||
+                (typeof currentTrack.artwork === 'string' && currentTrack.artwork) ||
                 'https://via.placeholder.com/50x50?text=Music',
             }}
             style={styles.artwork}
           />
           <View style={styles.textContainer}>
             <Text style={styles.title} numberOfLines={1}>
-              {currentTrack.title}
+              {currentTrack.title || 'Unknown Title'}
             </Text>
             <Text style={styles.artist} numberOfLines={1}>
-              {currentTrack.artist}
+              {currentTrack.artist || 'Unknown Artist'}
             </Text>
           </View>
         </TouchableOpacity>

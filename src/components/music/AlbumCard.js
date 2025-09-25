@@ -39,16 +39,16 @@ const AlbumCard = ({album}) => {
 
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>
-          {album.name}
+          {String(album.name || 'Unknown Album')}
         </Text>
         
         <Text style={styles.artist} numberOfLines={1}>
-          {album.artist}
+          {String(album.artist || 'Unknown Artist')}
         </Text>
         
         {album.songs && (
           <Text style={styles.songCount}>
-            {album.songs.length} song{album.songs.length !== 1 ? 's' : ''}
+            {String(album.songs.length)} song{album.songs.length !== 1 ? 's' : ''}
           </Text>
         )}
       </View>

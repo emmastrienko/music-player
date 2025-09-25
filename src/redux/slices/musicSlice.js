@@ -1,6 +1,6 @@
 // src/redux/slices/musicSlice.js
 import {createSlice, createAsyncThunk} from '@reduxjs/toolkit';
-import {fetchPopularSongs, searchSongs} from '../actions/musicActions';
+import {fetchPopularSongs, searchSongs, loadLocalMusic} from '../actions/musicActions';
 
 const initialState = {
   localSongs: [],
@@ -110,6 +110,18 @@ const musicSlice = createSlice({
       })
       .addCase(searchSongs.rejected, (state, action) => {
         state.searchLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(loadLocalMusic.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(loadLocalMusic.fulfilled, (state, action) => {
+        state.loading = false;
+        state.localSongs = action.payload;
+      })
+      .addCase(loadLocalMusic.rejected, (state, action) => {
+        state.loading = false;
         state.error = action.payload;
       });
   },
