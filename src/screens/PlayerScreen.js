@@ -165,45 +165,58 @@ const PlayerScreen = () => {
   const handlePlayPause = async () => {
     if (isLoading) return;
 
+    // Update UI immediately for better responsiveness
+    dispatch(setIsPlaying(!isPlaying));
+
     try {
-      if (isPlaying) {
-        await audioService.pause();
-        dispatch(setIsPlaying(false));
-        console.log("Paused playback");
-      } else {
-        await audioService.play();
-        dispatch(setIsPlaying(true));
+      if (!isPlaying) {
+        // Try to play
+        const result = await audioService.play();
+        if (!result.success) {
+          console.warn("Play failed, reverting state");
+          dispatch(setIsPlaying(false));
+        }
         console.log("Started playback");
+      } else {
+        // Try to pause
+        await audioService.pause();
+        console.log("Paused playback");
       }
     } catch (error) {
       console.error("Error during play/pause:", error);
-      // Still update UI state for demo purposes
-      dispatch(setIsPlaying(!isPlaying));
+      // Revert state on error
+      dispatch(setIsPlaying(isPlaying));
     }
   };
 
   const handleNext = async () => {
-    if (currentIndex < queue.length - 1 || repeatMode === "queue") {
+    if (currentIndex < queue.length - 1) {
       try {
+        setIsLoading(true);
         await audioService.stop();
         dispatch(nextTrack());
         console.log("Skipped to next track");
       } catch (error) {
         console.error("Error skipping to next track:", error);
         dispatch(nextTrack());
+      } finally {
+        setIsLoading(false);
       }
     }
   };
 
   const handlePrevious = async () => {
-    if (currentIndex > 0 || repeatMode === "queue") {
+    if (currentIndex > 0) {
       try {
+        setIsLoading(true);
         await audioService.stop();
         dispatch(previousTrack());
         console.log("Skipped to previous track");
       } catch (error) {
         console.error("Error skipping to previous track:", error);
         dispatch(previousTrack());
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -240,16 +253,21 @@ const PlayerScreen = () => {
 
   return (
     <LinearGradient
-      colors={[colors.gradientStart, colors.background]}
+      colors={colors.gradientHero}
       style={styles.container}
     >
+      {/* Backdrop blur effect */}
+      <View style={styles.backdrop} />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerButton}
         >
-          <Ionicons name="chevron-down" size={28} color={colors.textPrimary} />
+          <View style={styles.headerButtonBg}>
+            <Ionicons name="chevron-down" size={24} color={colors.textPrimary} />
+          </View>
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
@@ -260,16 +278,26 @@ const PlayerScreen = () => {
         </View>
 
         <TouchableOpacity style={styles.headerButton}>
-          <Ionicons
-            name="ellipsis-horizontal"
-            size={24}
-            color={colors.textPrimary}
-          />
+          <View style={styles.headerButtonBg}>
+            <Ionicons
+              name="ellipsis-horizontal"
+              size={20}
+              color={colors.textPrimary}
+            />
+          </View>
         </TouchableOpacity>
       </View>
 
       {/* Artwork */}
       <View style={styles.artworkContainer}>
+        {/* Glow effect */}
+        <Animated.View
+          style={[
+            styles.artworkGlow,
+            { transform: [{ scale: artworkScale }] },
+          ]}
+        />
+        
         <Animated.View
           style={[
             styles.artworkWrapper,
@@ -278,13 +306,31 @@ const PlayerScreen = () => {
         >
           <Image
             source={{
-              uri:
-                currentTrack.artwork ||
-                "https://via.placeholder.com/300x300?text=Music",
+              uri: currentTrack.artwork 
+                ? currentTrack.artwork.replace('100x100', '1000x1000').replace('60x60', '1000x1000')
+                : "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1000&h=1000&fit=crop&crop=center",
             }}
             style={styles.artwork}
+            resizeMode="cover"
+          />
+          
+          {/* Glassmorphic overlay */}
+          <LinearGradient
+            colors={['transparent', 'transparent', colors.overlayGlass]}
+            style={styles.artworkOverlay}
           />
         </Animated.View>
+        
+        {/* Floating elements */}
+        <View style={styles.floatingElements}>
+          {isPlaying && (
+            <View style={styles.pulseIndicator}>
+              <View style={[styles.pulse, styles.pulse1]} />
+              <View style={[styles.pulse, styles.pulse2]} />
+              <View style={[styles.pulse, styles.pulse3]} />
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Track Info */}
@@ -364,12 +410,19 @@ const PlayerScreen = () => {
             onPress={handlePlayPause}
             style={[styles.playButton, isLoading && styles.playButtonLoading]}
             disabled={isLoading}
+            activeOpacity={0.8}
           >
-            <Ionicons
-              name={isLoading ? "refresh" : isPlaying ? "pause" : "play"}
-              size={40}
-              color={colors.background}
-            />
+            <LinearGradient
+              colors={colors.gradientPrimary}
+              style={styles.playButtonGradient}
+            >
+              <Ionicons
+                name={isLoading ? "refresh" : isPlaying ? "pause" : "play"}
+                size={36}
+                color={colors.textPrimary}
+                style={{marginLeft: isPlaying ? 0 : 3}}
+              />
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -427,12 +480,17 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 50,
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlayGlass,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    zIndex: 1,
   },
   headerButton: {
     width: 44,
@@ -440,49 +498,113 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  headerButtonBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.overlayGlass,
+    justifyContent: "center",
+    alignItems: "center",
+    backdropFilter: 'blur(20px)',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
   headerCenter: {
     flex: 1,
     alignItems: "center",
   },
   headerTitle: {
-    ...typography.styles.labelLarge,
+    ...typography.styles.headingSmall,
     color: colors.textPrimary,
-    fontWeight: "600",
+    fontWeight: "700",
+    fontSize: 18,
   },
   headerSubtitle: {
     ...typography.styles.bodySmall,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
+    opacity: 0.8,
   },
   artworkContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 40,
-    paddingVertical: 40,
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+    position: 'relative',
+    marginTop: 20,
+  },
+  artworkGlow: {
+    position: 'absolute',
+    width: width - 40,
+    height: width - 40,
+    borderRadius: (width - 40) / 2,
+    backgroundColor: colors.primary,
+    opacity: 0.15,
+    zIndex: 0,
   },
   artworkWrapper: {
-    borderRadius: 20,
+    borderRadius: 24,
     shadowColor: colors.overlay,
     shadowOffset: {
       width: 0,
-      height: 20,
+      height: 24,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 25,
-    elevation: 15,
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
+    elevation: 20,
+    position: 'relative',
+    zIndex: 1,
   },
   artwork: {
-    width: width - 80,
-    height: width - 80,
-    borderRadius: 20,
+    width: width - 64,
+    height: width - 64,
+    borderRadius: 24,
     backgroundColor: colors.backgroundSecondary,
+  },
+  artworkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+  },
+  floatingElements: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+  },
+  pulseIndicator: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 24,
+    height: 24,
+  },
+  pulse: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    opacity: 0.3,
+  },
+  pulse1: {
+    animationDelay: '0s',
+  },
+  pulse2: {
+    animationDelay: '1s', 
+  },
+  pulse3: {
+    animationDelay: '2s',
   },
   trackInfo: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
   },
   trackDetails: {
     flex: 1,
@@ -490,15 +612,21 @@ const styles = StyleSheet.create({
   trackTitle: {
     ...typography.styles.headingMedium,
     color: colors.textPrimary,
-    fontWeight: "700",
-    marginBottom: 8,
+    fontWeight: "800",
+    marginBottom: 6,
+    fontSize: 20,
   },
   trackArtist: {
     ...typography.styles.bodyLarge,
     color: colors.textSecondary,
+    opacity: 0.9,
   },
   favoriteButton: {
-    padding: 8,
+    padding: 12,
+    backgroundColor: colors.overlayGlass,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   controls: {
     paddingHorizontal: 20,
@@ -521,24 +649,29 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   playButton: {
-    backgroundColor: colors.textPrimary,
+    borderRadius: 40,
+    width: 80,
+    height: 80,
+    marginHorizontal: 24,
+    shadowColor: colors.overlay,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  playButtonGradient: {
     borderRadius: 40,
     width: 80,
     height: 80,
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 30,
-    shadowColor: colors.overlay,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
   },
   playButtonLoading: {
-    opacity: 0.7,
+    opacity: 0.8,
+    transform: [{scale: 0.95}],
   },
   repeatIndicator: {
     position: "absolute",

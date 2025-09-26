@@ -14,7 +14,7 @@ import {useNavigation} from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import {setLocalSongs, createPlaylist} from '../../redux/slices/musicSlice';
 import {loadLocalMusic} from '../../redux/actions/musicActions';
-import SongCard from '../../components/music/SongCard';
+import EnhancedSongCard from '../../components/music/EnhancedSongCard';
 import PlaylistCard from '../../components/music/PlaylistCard';
 import Header from '../../components/common/Header';
 import Button from '../../components/common/Button';
@@ -188,7 +188,11 @@ const LibraryScreen = () => {
 
   const renderSongItem = ({item}) => (
     <View style={styles.songItem}>
-      <SongCard song={item} showArtwork={false} />
+      <EnhancedSongCard 
+        song={item} 
+        variant="compact" 
+        showArtwork={true} 
+      />
     </View>
   );
 
@@ -329,10 +333,9 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   songItem: {
-    backgroundColor: colors.backgroundTertiary,
-    borderRadius: 8,
-    marginBottom: 8,
-    padding: 12,
+    backgroundColor: 'transparent',
+    marginBottom: 12,
+    marginHorizontal: 4,
   },
   playlistsContainer: {
     flex: 1,

@@ -82,12 +82,16 @@ const HomeScreen = () => {
   }
 
   return (
-    <View style={globalStyles.container}>
+    <View style={[globalStyles.container, styles.container]}>
       <LinearGradient
-        colors={[colors.gradientStart, colors.background]}
+        colors={colors.gradientHero}
         style={styles.gradientHeader}>
-        <Header title="Home" showProfile />
-        {renderGreeting()}
+        <Header 
+          title={renderGreeting()} 
+          subtitle="What would you like to listen to?"
+          showProfile 
+        />
+        {/* {renderGreeting()} */}
       </LinearGradient>
 
       <ScrollView
@@ -161,15 +165,20 @@ const HomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   gradientHeader: {
-    paddingTop: 40,
-    paddingBottom: 20,
+    paddingTop: 0, // Remove extra padding
+    paddingBottom: 15,
   },
   greeting: {
-    ...typography.styles.headingLarge,
+    ...typography.styles.headingMedium,
     color: colors.textPrimary,
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 10,
+    marginBottom: 5,
   },
   content: {
     flex: 1,

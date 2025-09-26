@@ -40,18 +40,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
-    backgroundColor: colors.background,
+    paddingTop: 20,
+    paddingBottom: 5, // Reduced padding
+    backgroundColor: 'transparent',
   },
   title: {
-    ...typography.styles.headingMedium,
+    ...typography.styles.labelLarge, // Even smaller title
     color: colors.textPrimary,
-    fontWeight: '700',
+    fontWeight: '600',
+    fontSize: 18, // Explicit smaller font size
   },
   iconButton: {
-    width: 44,
-    height: 44,
+    width: 36, // Smaller icon buttons
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },

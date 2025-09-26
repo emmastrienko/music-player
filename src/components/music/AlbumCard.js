@@ -31,9 +31,11 @@ const AlbumCard = ({album}) => {
       <View style={styles.artworkContainer}>
         <Image
           source={{
-            uri: album.artwork || 'https://via.placeholder.com/200x200?text=Album'
+            uri: album.artwork || 'https://via.placeholder.com/400x400?text=Album'
           }}
           style={styles.artwork}
+          resizeMode="cover"
+          defaultSource={{uri: 'https://via.placeholder.com/400x400?text=Album'}}
         />
       </View>
 

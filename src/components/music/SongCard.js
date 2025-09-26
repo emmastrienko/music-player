@@ -24,6 +24,7 @@ import {audioService} from '../../services/audioService';
 
 const {width} = Dimensions.get('window');
 const CARD_WIDTH = width * 0.45;
+const ARTWORK_SIZE = CARD_WIDTH * 0.85;
 
 const SongCard = ({song, onPress, showArtwork = true, index}) => {
   const dispatch = useDispatch();
@@ -109,90 +110,122 @@ const SongCard = ({song, onPress, showArtwork = true, index}) => {
       
       {showArtwork && (
         <View style={styles.artworkContainer}>
+          {/* Glassmorphic background */}
+          <View style={styles.artworkGlow} />
+          
           <Image
             source={{
-              uri: (typeof song.artwork === 'string' && song.artwork) || 'https://via.placeholder.com/150x150?text=Music'
+              uri: (typeof song.artwork === 'string' && song.artwork) 
+                ? song.artwork.replace('100x100', '600x600').replace('60x60', '600x600') // Higher resolution
+                : 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=600&fit=crop&crop=center'
             }}
             style={styles.artwork}
+            resizeMode="cover"
+          />
+          
+          {/* Gradient overlay */}
+          <LinearGradient
+            colors={['transparent', 'transparent', colors.overlayLight]}
+            style={styles.gradientOverlay}
           />
           
           {/* Play indicator overlay */}
           {isCurrentTrack && (
-            <LinearGradient
-              colors={['transparent', colors.overlay]}
-              style={styles.playOverlay}>
-              <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
-                size={24}
-                color={colors.textPrimary}
-              />
-            </LinearGradient>
+            <View style={styles.playOverlay}>
+              <LinearGradient
+                colors={colors.gradientPrimary}
+                style={styles.playButton}>
+                <Ionicons
+                  name={isPlaying ? 'pause' : 'play'}
+                  size={20}
+                  color={colors.textPrimary}
+                />
+              </LinearGradient>
+            </View>
           )}
           
           {/* Favorite button */}
           <TouchableOpacity
             style={styles.favoriteButton}
             onPress={handleFavoriteToggle}>
-            <Ionicons
-              name={isFavorite ? 'heart' : 'heart-outline'}
-              size={18}
-              color={isFavorite ? colors.error : colors.textSecondary}
-            />
+            <View style={[styles.favoriteButtonBg, isFavorite && styles.favoriteButtonBgActive]}>
+              <Ionicons
+                name={isFavorite ? 'heart' : 'heart-outline'}
+                size={16}
+                color={isFavorite ? colors.textPrimary : colors.textSecondary}
+              />
+            </View>
           </TouchableOpacity>
         </View>
       )}
 
       <View style={styles.content}>
-        <Text
-          style={[
-            styles.title,
-            isCurrentTrack && {color: colors.primary}
-          ]}
-          numberOfLines={2}>
-          {(() => {
-            try {
-              const title = song.title || 'Unknown Title';
-              return String(title);
-            } catch (error) {
-              console.error('Error rendering title:', error);
-              return 'Unknown Title';
-            }
-          })()}
-        </Text>
-        
-        <Text style={styles.artist} numberOfLines={1}>
-          {(() => {
-            try {
-              const artist = song.artist || 'Unknown Artist';
-              return String(artist);
-            } catch (error) {
-              console.error('Error rendering artist:', error);
-              return 'Unknown Artist';
-            }
-          })()}
-        </Text>
-        
-        <View style={styles.footer}>
-          <Text style={styles.duration}>
+        <View style={styles.textContainer}>
+          <Text
+            style={[
+              styles.title,
+              isCurrentTrack && {color: colors.primary}
+            ]}
+            numberOfLines={2}>
             {(() => {
               try {
-                if (song.duration && typeof song.duration === 'number') {
-                  const duration = formatDuration(song.duration);
-                  return String(duration);
-                }
-                return '0:00';
+                const title = song.title || 'Unknown Title';
+                return String(title);
               } catch (error) {
-                console.error('Error rendering duration:', error);
-                return '0:00';
+                console.error('Error rendering title:', error);
+                return 'Unknown Title';
               }
             })()}
           </Text>
-          {song.isLocal === true && (
-            <Ionicons
-              name="phone-portrait-outline"
-              size={12}
-              color={colors.textMuted}
-            />
+          
+          <Text style={styles.artist} numberOfLines={1}>
+            {(() => {
+              try {
+                const artist = song.artist || 'Unknown Artist';
+                return String(artist);
+              } catch (error) {
+                console.error('Error rendering artist:', error);
+                return 'Unknown Artist';
+              }
+            })()}
+          </Text>
+        </View>
+        
+        <View style={styles.footer}>
+          <View style={styles.metaInfo}>
+            <Text style={styles.duration}>
+              {(() => {
+                try {
+                  if (song.duration && typeof song.duration === 'number') {
+                    const duration = formatDuration(song.duration);
+                    return String(duration);
+                  }
+                  return '0:00';
+                } catch (error) {
+                  console.error('Error rendering duration:', error);
+                  return '0:00';
+                }
+              })()}
+            </Text>
+            {song.isLocal === true && (
+              <View style={styles.localBadge}>
+                <Ionicons
+                  name="phone-portrait-outline"
+                  size={10}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.localText}>Local</Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Quality indicator */}
+          {isCurrentTrack && (
+            <View style={styles.playingIndicator}>
+              <View style={[styles.waveBar, {animationDelay: '0ms'}]} />
+              <View style={[styles.waveBar, {animationDelay: '150ms'}]} />
+              <View style={[styles.waveBar, {animationDelay: '300ms'}]} />
+            </View>
           )}
         </View>
       </View>
@@ -202,58 +235,153 @@ const SongCard = ({song, onPress, showArtwork = true, index}) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginRight: 12,
-    backgroundColor: colors.backgroundTertiary,
-    borderRadius: 8,
+    marginRight: 16,
+    backgroundColor: colors.cardBackground,
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: colors.overlay,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   artworkContainer: {
     position: 'relative',
+    margin: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  artworkGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    backgroundColor: colors.primary,
+    opacity: 0.1,
+    borderRadius: 20,
+    zIndex: 0,
   },
   artwork: {
-    width: '100%',
-    height: CARD_WIDTH * 0.8,
+    width: ARTWORK_SIZE,
+    height: ARTWORK_SIZE,
     backgroundColor: colors.backgroundSecondary,
+    borderRadius: 12,
+  },
+  gradientOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 12,
   },
   playOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlayLight,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.overlayLight,
+    borderRadius: 12,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.overlay,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   favoriteButton: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: colors.overlay,
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    zIndex: 2,
+  },
+  favoriteButtonBg: {
+    backgroundColor: colors.overlayGlass,
+    borderRadius: 16,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
+    backdropFilter: 'blur(10px)',
+  },
+  favoriteButtonBgActive: {
+    backgroundColor: colors.error,
   },
   content: {
     padding: 12,
+    paddingTop: 4,
+  },
+  textContainer: {
+    marginBottom: 8,
   },
   title: {
     ...typography.styles.labelLarge,
     color: colors.textPrimary,
     fontWeight: '600',
     marginBottom: 4,
+    fontSize: 14,
   },
   artist: {
     ...typography.styles.bodySmall,
     color: colors.textSecondary,
-    marginBottom: 8,
+    fontSize: 12,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  metaInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   duration: {
     ...typography.styles.labelSmall,
     color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  localBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 2,
+  },
+  localText: {
+    ...typography.styles.labelSmall,
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: '500',
+  },
+  playingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  waveBar: {
+    width: 2,
+    height: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 1,
   },
 });
 

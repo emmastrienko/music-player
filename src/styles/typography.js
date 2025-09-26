@@ -3,16 +3,18 @@ import {Platform} from 'react-native';
 
 const fontFamily = Platform.select({
   ios: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
-    light: 'System',
+    regular: '-apple-system',
+    medium: '-apple-system',
+    bold: '-apple-system',
+    light: '-apple-system',
+    black: '-apple-system',
   },
   android: {
     regular: 'Roboto',
     medium: 'Roboto-Medium',
     bold: 'Roboto-Bold',
     light: 'Roboto-Light',
+    black: 'Roboto-Black',
   },
 });
 
