@@ -6,10 +6,19 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import {useSelector, useDispatch} from 'react-redux';
+import {Ionicons} from '@expo/vector-icons';
 import {searchSongs} from '../../redux/actions/musicActions';
 import {setSearchQuery, clearSearchResults} from '../../redux/slices/musicSlice';
+import {
+  setCurrentTrack,
+  setQueue,
+  setCurrentIndex,
+  setIsPlaying,
+} from '../../redux/slices/playerSlice';
+import {addToRecentlyPlayed} from '../../redux/slices/musicSlice';
 import SearchBar from '../../components/common/SearchBar';
 import SongCard from '../../components/music/SongCard';
 import Loading from '../../components/common/Loading';
@@ -50,6 +59,21 @@ const SearchScreen = () => {
     setSearchText(genre);
   };
 
+  const handlePlaySong = (song) => {
+    dispatch(setCurrentTrack(song));
+    dispatch(setQueue([song]));
+    dispatch(setCurrentIndex(0));
+    dispatch(setIsPlaying(true));
+    dispatch(addToRecentlyPlayed(song));
+  };
+
+  const formatDuration = (seconds) => {
+    if (!seconds || typeof seconds !== 'number') return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const renderGenreItem = ({item}) => (
     <TouchableOpacity
       style={styles.genreItem}
@@ -59,9 +83,36 @@ const SearchScreen = () => {
   );
 
   const renderSongItem = ({item, index}) => (
-    <View style={styles.songItem}>
-      <SongCard song={item} showArtwork={false} index={index} />
-    </View>
+    <TouchableOpacity style={styles.songItemHorizontal} onPress={() => handlePlaySong(item)}>
+      <Image
+        source={{
+          uri: item.artwork || 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300&h=300&fit=crop&crop=center'
+        }}
+        style={styles.songArtwork}
+        resizeMode="cover"
+      />
+      <View style={styles.songInfo}>
+        <Text style={styles.songTitle} numberOfLines={1}>
+          {item.title || 'Unknown Title'}
+        </Text>
+        <Text style={styles.songArtist} numberOfLines={1}>
+          {item.artist || 'Unknown Artist'}
+        </Text>
+        <Text style={styles.songDuration}>
+          {formatDuration(item.duration)}
+        </Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.playButton}
+        onPress={() => handlePlaySong(item)}
+      >
+        <Ionicons 
+          name="play" 
+          size={20} 
+          color={colors.textPrimary} 
+        />
+      </TouchableOpacity>
+    </TouchableOpacity>
   );
 
   const renderEmptyComponent = () => (
@@ -147,6 +198,58 @@ const styles = StyleSheet.create({
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  songItemHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundTertiary,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: colors.overlay,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  songArtwork: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundSecondary,
+    marginRight: 12,
+  },
+  songInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  songTitle: {
+    ...typography.styles.labelLarge,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  songArtist: {
+    ...typography.styles.bodyMedium,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  songDuration: {
+    ...typography.styles.bodySmall,
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
