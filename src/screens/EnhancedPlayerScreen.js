@@ -145,7 +145,11 @@ const EnhancedPlayerScreen = () => {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('Home'); // or your default screen name
+      }
     });
   };
 
@@ -409,6 +413,12 @@ const EnhancedPlayerScreen = () => {
   );
 
   if (!currentTrack) {
+    // Check if we can go back, otherwise navigate to a default screen
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Home'); // or your default screen name
+    }
     return null;
   }
 

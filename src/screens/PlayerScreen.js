@@ -160,7 +160,12 @@ const PlayerScreen = () => {
   }, [isPlaying, artworkScale]);
 
   if (!currentTrack) {
-    navigation.goBack();
+    // Check if we can go back, otherwise navigate to a default screen
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Home'); // or your default screen name
+    }
     return null;
   }
 
@@ -264,7 +269,13 @@ const PlayerScreen = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Home'); // or your default screen name
+            }
+          }}
           style={styles.headerButton}
         >
           <View style={styles.headerButtonBg}>
@@ -354,8 +365,24 @@ const PlayerScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Progress Bar */}
-      <ProgressBar />
+      {/* Progress Bar with Play Button */}
+      <View style={styles.progressSection}>
+        <TouchableOpacity
+          onPress={handlePlayPause}
+          style={styles.progressPlayButton}
+          disabled={isLoading}
+        >
+          <Ionicons
+            name={isLoading ? "refresh" : isPlaying ? "pause" : "play"}
+            size={20}
+            color={colors.textPrimary}
+            style={{marginLeft: isPlaying ? 0 : 2}}
+          />
+        </TouchableOpacity>
+        <View style={styles.progressBarContainer}>
+          <ProgressBar />
+        </View>
+      </View>
 
       {/* Controls */}
       <View style={styles.controls}>
@@ -625,6 +652,33 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
+  },
+  progressSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  progressPlayButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+    shadowColor: colors.overlay,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  progressBarContainer: {
+    flex: 1,
   },
   controls: {
     paddingHorizontal: 20,
