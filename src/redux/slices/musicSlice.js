@@ -84,6 +84,41 @@ const musicSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    updateSongInLibrary: (state, action) => {
+      const updatedSong = action.payload;
+      
+      // Update in local songs
+      const localIndex = state.localSongs.findIndex(song => song.id === updatedSong.id);
+      if (localIndex !== -1) {
+        state.localSongs[localIndex] = updatedSong;
+      }
+      
+      // Update in favorites
+      const favIndex = state.favorites.findIndex(song => song.id === updatedSong.id);
+      if (favIndex !== -1) {
+        state.favorites[favIndex] = updatedSong;
+      }
+      
+      // Update in recently played
+      const recentIndex = state.recentlyPlayed.findIndex(song => song.id === updatedSong.id);
+      if (recentIndex !== -1) {
+        state.recentlyPlayed[recentIndex] = updatedSong;
+      }
+      
+      // Update in search results
+      const searchIndex = state.searchResults.findIndex(song => song.id === updatedSong.id);
+      if (searchIndex !== -1) {
+        state.searchResults[searchIndex] = updatedSong;
+      }
+      
+      // Update in playlists
+      state.playlists.forEach(playlist => {
+        const playlistIndex = playlist.songs.findIndex(song => song.id === updatedSong.id);
+        if (playlistIndex !== -1) {
+          playlist.songs[playlistIndex] = updatedSong;
+        }
+      });
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -140,6 +175,7 @@ export const {
   clearSearchResults,
   setError,
   clearError,
+  updateSongInLibrary,
 } = musicSlice.actions;
 
 export default musicSlice.reducer;

@@ -12,6 +12,7 @@ import {
 import {useSelector, useDispatch} from 'react-redux';
 import {useNavigation} from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as MediaLibrary from 'expo-media-library';
 import {setLocalSongs, createPlaylist} from '../../redux/slices/musicSlice';
 import {loadLocalMusic} from '../../redux/actions/musicActions';
 import EnhancedSongCard from '../../components/music/EnhancedSongCard';
@@ -37,17 +38,137 @@ const LibraryScreen = () => {
   const [selectedTab, setSelectedTab] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
+  const [permissionStatus, setPermissionStatus] = useState('unknown'); // 'granted', 'denied', 'unknown'
+  const [showPermissionCard, setShowPermissionCard] = useState(false);
 
   useEffect(() => {
-    loadLocalMusicFiles();
+    checkPermissionsAndLoad();
   }, []);
+
+  // Add focus listener to re-check permissions when returning from settings
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('📱 Screen focused, re-checking permissions...');
+      checkPermissionsAndLoad();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const checkPermissionsAndLoad = async () => {
+    try {
+      console.log('🔍 Checking permissions and loading...');
+      // Check permission status first without requesting
+      const hasPermission = await localMusicService.checkPermissions();
+      console.log('Permission check result:', hasPermission);
+      
+      setPermissionStatus(hasPermission ? 'granted' : 'denied');
+      
+      if (hasPermission) {
+        console.log('✅ Permissions granted, hiding permission card and loading music');
+        setShowPermissionCard(false);
+        await loadLocalMusicFiles();
+      } else {
+        console.log('❌ Permissions not granted, showing permission card');
+        setShowPermissionCard(true);
+      }
+    } catch (error) {
+      console.error('Error checking permissions:', error);
+      setPermissionStatus('denied');
+      setShowPermissionCard(true);
+    }
+  };
+
+  const requestPermissionAndLoad = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🔄 Requesting permissions...');
+      // First check current status to see if we can ask
+      const currentStatus = await MediaLibrary.getPermissionsAsync();
+      console.log('Permission check before request:', currentStatus);
+      
+      let hasPermission = await localMusicService.requestPermissions();
+      
+      // If normal request failed, try force request
+      if (!hasPermission) {
+        console.log('Normal request failed, trying force request...');
+        hasPermission = await localMusicService.forceRequestPermissions();
+      }
+      
+      // Double-check permission status after request
+      const finalStatus = await localMusicService.checkPermissions();
+      console.log('Final permission check after request:', finalStatus);
+      
+      setPermissionStatus(finalStatus ? 'granted' : 'denied');
+      
+      if (finalStatus) {
+        console.log('✅ Permissions successfully granted, loading music...');
+        setShowPermissionCard(false);
+        await loadLocalMusicFiles();
+      } else {
+        console.log('❌ Permissions still not granted');
+        setShowPermissionCard(true);
+        
+        // Check if permission was permanently denied
+        const newStatus = await MediaLibrary.getPermissionsAsync();
+        console.log('Permission status after denial:', newStatus);
+        
+        if (newStatus.canAskAgain === false) {
+          Alert.alert(
+            'Permission Required',
+            'To access your music files, please:\n\n1. Go to device Settings\n2. Find this app\n3. Enable Media/Storage permissions\n4. Return to the app',
+            [
+              {text: 'OK', style: 'default'},
+            ]
+          );
+        } else if (newStatus.status === 'denied') {
+          // Permission denied but can ask again
+          console.log('Permission denied but can ask again');
+          Alert.alert(
+            'Permission Required',
+            'Media access is needed to play local music. Please allow access when prompted.',
+            [
+              {text: 'Cancel', style: 'cancel'},
+              {text: 'Try Again', onPress: requestPermissionAndLoad},
+            ]
+          );
+        } else {
+          // Unexpected state
+          console.warn('Unexpected permission state:', newStatus);
+          Alert.alert(
+            'Permission Issue',
+            'Unable to request media access. Please check your device settings.',
+            [
+              {text: 'OK', style: 'default'},
+            ]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error requesting permission:', error);
+      setPermissionStatus('denied');
+      setShowPermissionCard(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const loadLocalMusicFiles = async () => {
     setIsLoading(true);
     try {
-      console.log('=== DEBUG: Starting local music load ===');
+      console.log('🎵 Starting local music load...');
+      
+      // Verify permissions one more time before loading
+      const hasPermission = await localMusicService.checkPermissions();
+      if (!hasPermission) {
+        console.log('❌ No permission during music load, showing permission card');
+        setShowPermissionCard(true);
+        setPermissionStatus('denied');
+        return;
+      }
+      
       const result = await dispatch(loadLocalMusic()).unwrap();
-      console.log('Local music loaded successfully:', {
+      console.log('✅ Local music loaded successfully:', {
         count: result?.length || 0,
         firstSong: result?.[0] ? {
           title: result[0].title,
@@ -55,8 +176,13 @@ const LibraryScreen = () => {
           isLocal: result[0].isLocal
         } : null
       });
+      
+      // Successfully loaded music, ensure permission card is hidden
+      setShowPermissionCard(false);
+      setPermissionStatus('granted');
+      
     } catch (error) {
-      console.error('Error loading local music:', error);
+      console.error('❌ Error loading local music:', error);
       
       // Determine the type of error and show appropriate message
       let title = 'Error Loading Local Music';
@@ -64,10 +190,13 @@ const LibraryScreen = () => {
       
       if (error.message && error.message.includes('permission')) {
         title = 'Permission Required';
-        message = 'To play local music, please grant access to your media library in device settings.';
+        message = 'Media library access was denied. Please grant permission to access local music.';
+        setShowPermissionCard(true);
+        setPermissionStatus('denied');
       } else if (error.message && error.message.includes('No audio files found')) {
         title = 'No Music Found';
         message = 'No audio files were found on your device. Please add some music files and try again.';
+        // Don't show permission card for this error - it's not a permission issue
       } else {
         message = `Error: ${error.message || 'Unknown error occurred'}`;
       }
@@ -78,7 +207,7 @@ const LibraryScreen = () => {
         message,
         [
           {text: 'Cancel', style: 'cancel'},
-          {text: 'Try Again', onPress: loadLocalMusicFiles},
+          {text: 'Try Again', onPress: checkPermissionsAndLoad},
         ]
       );
     } finally {
@@ -128,6 +257,26 @@ const LibraryScreen = () => {
       }
     } catch (error) {
       setDebugInfo(prev => prev + `\nError: ${error.message}`);
+    }
+  };
+
+  const testForcePermission = async () => {
+    try {
+      console.log('=== FORCE PERMISSION TEST ===');
+      const result = await localMusicService.forceRequestPermissions();
+      console.log('Force permission result:', result);
+      
+      if (result) {
+        setPermissionStatus('granted');
+        setShowPermissionCard(false);
+        Alert.alert('Success!', 'Permission granted! Loading local music...');
+        await loadLocalMusicFiles();
+      } else {
+        Alert.alert('Permission Denied', 'Unable to get media access permission.');
+      }
+    } catch (error) {
+      console.error('Force permission test error:', error);
+      Alert.alert('Error', `Permission test failed: ${error.message}`);
     }
   };
 
@@ -215,8 +364,51 @@ const LibraryScreen = () => {
     }
   };
 
+  const renderPermissionCard = () => {
+    if (!showPermissionCard) return null;
+
+    return (
+      <View style={styles.permissionCard}>
+        <View style={styles.permissionIconContainer}>
+          <Ionicons name="musical-notes" size={48} color={colors.primary} />
+        </View>
+        <Text style={styles.permissionTitle}>Allow Media Access</Text>
+        <Text style={styles.permissionDescription}>
+          Grant permission to access and play music files stored on your device.
+        </Text>
+        <View style={styles.permissionButtons}>
+          <Button
+            title="Allow Media Access"
+            onPress={requestPermissionAndLoad}
+            style={styles.permissionButton}
+            icon="checkmark-circle"
+            loading={isLoading}
+          />
+          <Button
+            title="Refresh Status"
+            onPress={checkPermissionsAndLoad}
+            style={[styles.permissionButton, {backgroundColor: colors.secondary, marginTop: 10}]}
+            icon="refresh"
+            loading={isLoading}
+          />
+          <TouchableOpacity 
+            style={styles.skipButton}
+            onPress={() => setShowPermissionCard(false)}
+          >
+            <Text style={styles.skipButtonText}>Skip for now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
   const renderContent = () => {
     const data = getCurrentData();
+
+    // Show permission card for local tab when permissions are needed
+    if ((selectedTab === 'local' || selectedTab === 'all') && showPermissionCard) {
+      return renderPermissionCard();
+    }
 
     if (selectedTab === 'playlists') {
       return (
@@ -228,12 +420,18 @@ const LibraryScreen = () => {
             icon="add"
           />
           
-          {/* Debug button - remove in production */}
+          {/* Debug buttons - remove in production */}
           <Button
             title="Debug Local Music"
             onPress={testLocalMusicDirect}
             style={[styles.createButton, {backgroundColor: colors.error, marginTop: 10}]}
             icon="bug"
+          />
+          <Button
+            title="Force Permission Request"
+            onPress={testForcePermission}
+            style={[styles.createButton, {backgroundColor: colors.primary, marginTop: 10}]}
+            icon="lock-open"
           />
           
           <FlatList
@@ -247,6 +445,25 @@ const LibraryScreen = () => {
       );
     }
 
+    // Show empty state for local songs when no permission
+    if (selectedTab === 'local' && localSongs.length === 0 && permissionStatus === 'denied') {
+      return (
+        <View style={styles.emptyState}>
+          <Ionicons name="folder-open-outline" size={64} color={colors.textMuted} />
+          <Text style={styles.emptyStateTitle}>No Local Music</Text>
+          <Text style={styles.emptyStateDescription}>
+            Permission required to access music files on your device.
+          </Text>
+          <Button
+            title="Request Permission"
+            onPress={requestPermissionAndLoad}
+            style={styles.retryButton}
+            icon="refresh"
+          />
+        </View>
+      );
+    }
+
     return (
       <FlatList
         data={data}
@@ -255,7 +472,7 @@ const LibraryScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         refreshing={isLoading}
-        onRefresh={loadLocalMusicFiles}
+        onRefresh={checkPermissionsAndLoad}
       />
     );
   };
@@ -368,6 +585,84 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textPrimary,
     fontWeight: 'bold',
+  },
+  permissionCard: {
+    backgroundColor: colors.backgroundSecondary,
+    margin: 20,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: colors.overlay,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  permissionIconContainer: {
+    backgroundColor: colors.primary + '20',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  permissionTitle: {
+    ...typography.styles.headingMedium,
+    color: colors.textPrimary,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  permissionDescription: {
+    ...typography.styles.bodyMedium,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  permissionButtons: {
+    width: '100%',
+  },
+  permissionButton: {
+    marginBottom: 12,
+  },
+  skipButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  skipButtonText: {
+    ...typography.styles.labelMedium,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyStateTitle: {
+    ...typography.styles.headingMedium,
+    color: colors.textPrimary,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    ...typography.styles.bodyMedium,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  retryButton: {
+    minWidth: 160,
   },
 });
 

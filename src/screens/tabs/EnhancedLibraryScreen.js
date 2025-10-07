@@ -26,6 +26,7 @@ import CreatePlaylistModal from '../../components/common/CreatePlaylistModal';
 import { colors } from '../../styles/colors';
 import { typography } from '../../styles/typography';
 import { globalStyles } from '../../styles/globalStyles';
+import { SmallGradientArtwork } from '../../components/common/GradientArtwork';
 
 const EnhancedLibraryScreen = () => {
   const navigation = useNavigation();
@@ -198,10 +199,10 @@ const EnhancedLibraryScreen = () => {
       style={styles.favoriteItem}
       onPress={() => handlePlaySong(item, favorites)}
     >
-      <Image
-        source={{ uri: item.artwork || 'https://via.placeholder.com/50x50?text=♪' }}
+      <SmallGradientArtwork 
+        song={item}
+        size={50}
         style={styles.favoriteArtwork}
-        resizeMode="cover"
       />
       
       <View style={styles.favoriteInfo}>

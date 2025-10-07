@@ -77,6 +77,18 @@ const playerSlice = createSlice({
     resetPlayer: (state) => {
       return initialState;
     },
+    updateSongInQueue: (state, action) => {
+      const updatedSong = action.payload;
+      // Update song in queue if it exists
+      const queueIndex = state.queue.findIndex(song => song.id === updatedSong.id);
+      if (queueIndex !== -1) {
+        state.queue[queueIndex] = updatedSong;
+      }
+      // Update current track if it's the same song
+      if (state.currentTrack?.id === updatedSong.id) {
+        state.currentTrack = updatedSong;
+      }
+    },
   },
 });
 
@@ -96,6 +108,7 @@ export const {
   previousTrack,
   setLoading,
   resetPlayer,
+  updateSongInQueue,
 } = playerSlice.actions;
 
 export default playerSlice.reducer;

@@ -11,6 +11,8 @@ import {
 import {useDispatch, useSelector} from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import EditSongModal from '../common/EditSongModal';
+import { SmallGradientArtwork } from '../common/GradientArtwork';
 import {
   setCurrentTrack,
   setQueue,
@@ -30,6 +32,7 @@ const SongCard = ({song, onPress, showArtwork = true, index}) => {
   const dispatch = useDispatch();
   const {currentTrack, isPlaying} = useSelector(state => state.player);
   const {favorites} = useSelector(state => state.music);
+  const [showEditModal, setShowEditModal] = React.useState(false);
   
   // Safety check - ensure song has required properties
   if (!song || !song.id) {
@@ -113,14 +116,10 @@ const SongCard = ({song, onPress, showArtwork = true, index}) => {
           {/* Glassmorphic background */}
           <View style={styles.artworkGlow} />
           
-          <Image
-            source={{
-              uri: (typeof song.artwork === 'string' && song.artwork) 
-                ? song.artwork.replace('100x100', '600x600').replace('60x60', '600x600') // Higher resolution
-                : 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=600&fit=crop&crop=center'
-            }}
+          <SmallGradientArtwork 
+            song={song}
+            size={ARTWORK_SIZE}
             style={styles.artwork}
-            resizeMode="cover"
           />
           
           {/* Gradient overlay */}
@@ -156,6 +155,21 @@ const SongCard = ({song, onPress, showArtwork = true, index}) => {
               />
             </View>
           </TouchableOpacity>
+
+          {/* Edit button for local songs */}
+          {song.isLocal && (
+            <TouchableOpacity
+              style={[styles.favoriteButton, styles.editButton]}
+              onPress={() => setShowEditModal(true)}>
+              <View style={styles.favoriteButtonBg}>
+                <Ionicons
+                  name="create-outline"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -229,6 +243,17 @@ const SongCard = ({song, onPress, showArtwork = true, index}) => {
           )}
         </View>
       </View>
+
+      {/* Edit Modal */}
+      <EditSongModal
+        visible={showEditModal}
+        song={song}
+        onClose={() => setShowEditModal(false)}
+        onSongUpdated={(updatedSong) => {
+          // The Redux actions in the modal will handle the updates
+          console.log('Song updated:', updatedSong.title);
+        }}
+      />
     </TouchableOpacity>
   );
 };
@@ -321,6 +346,9 @@ const styles = StyleSheet.create({
   },
   favoriteButtonBgActive: {
     backgroundColor: colors.error,
+  },
+  editButton: {
+    top: 44, // Position below favorite button
   },
   content: {
     padding: 12,

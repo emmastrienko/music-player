@@ -32,9 +32,11 @@ import VolumeControl from "../components/player/VolumeControl";
 import { audioService } from "../services/audioService";
 import { colors } from "../styles/colors";
 import { typography } from "../styles/typography";
+import { LargeGradientArtwork } from '../components/common/GradientArtwork';
 import { globalStyles } from "../styles/globalStyles";
 
 const { width, height } = Dimensions.get("window");
+const ARTWORK_SIZE = Math.min(width, height) * 0.7;
 
 const PlayerScreen = () => {
   const navigation = useNavigation();
@@ -304,14 +306,10 @@ const PlayerScreen = () => {
             { transform: [{ scale: artworkScale }] },
           ]}
         >
-          <Image
-            source={{
-              uri: currentTrack.artwork 
-                ? currentTrack.artwork.replace('100x100', '1000x1000').replace('60x60', '1000x1000')
-                : "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1000&h=1000&fit=crop&crop=center",
-            }}
+          <LargeGradientArtwork 
+            song={currentTrack}
+            size={ARTWORK_SIZE}
             style={styles.artwork}
-            resizeMode="cover"
           />
           
           {/* Glassmorphic overlay */}

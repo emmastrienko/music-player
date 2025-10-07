@@ -1,23 +1,117 @@
 // src/services/localMusicService.js
 import { Platform } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
+import { artworkStorageService } from './artworkStorageService';
+import { defaultArtworkService } from './defaultArtworkService';
 
 class LocalMusicService {
+  // Check current permission status without requesting
+  async checkPermissions() {
+    try {
+      const { status } = await MediaLibrary.getPermissionsAsync();
+      console.log('Current permission status:', status);
+      return status === 'granted';
+    } catch (error) {
+      console.error('Error checking permissions:', error);
+      return false;
+    }
+  }
+
+  // Get detailed permission info for debugging
+  async getPermissionDetails() {
+    try {
+      const result = await MediaLibrary.getPermissionsAsync();
+      console.log('📋 Detailed permission info:', {
+        status: result.status,
+        canAskAgain: result.canAskAgain,
+        granted: result.granted,
+        expires: result.expires
+      });
+      return result;
+    } catch (error) {
+      console.error('Error getting permission details:', error);
+      return null;
+    }
+  }
+
+  // Force permission request - ignores current state
+  async forceRequestPermissions() {
+    try {
+      console.log('🔄 Force requesting permissions...');
+      
+      // Get current state for logging
+      const before = await MediaLibrary.getPermissionsAsync();
+      console.log('State before force request:', before);
+      
+      // Force request regardless of current state
+      const result = await MediaLibrary.requestPermissionsAsync(false);
+      console.log('Force request result:', result);
+      
+      if (result.status !== 'granted' && result.canAskAgain !== false) {
+        console.log('🔄 Trying with write permissions...');
+        const writeResult = await MediaLibrary.requestPermissionsAsync(true);
+        console.log('Write permission force result:', writeResult);
+        return writeResult.status === 'granted';
+      }
+      
+      return result.status === 'granted';
+    } catch (error) {
+      console.error('Error in force request:', error);
+      return false;
+    }
+  }
+
   // Request permissions for media library
   async requestPermissions() {
     try {
-      console.log('Requesting media library permissions...');
+      console.log('🔍 Checking media library permissions...');
       
-      // Request both read and write permissions for better compatibility
-      const { status } = await MediaLibrary.requestPermissionsAsync(true);
+      // Check current status first
+      const currentStatus = await MediaLibrary.getPermissionsAsync();
+      console.log('Current permission details:', {
+        status: currentStatus.status,
+        canAskAgain: currentStatus.canAskAgain,
+        granted: currentStatus.granted
+      });
       
-      console.log('Permission request result:', status);
-      
-      if (status === 'granted') {
-        console.log('✅ Media library permissions granted');
+      if (currentStatus.status === 'granted') {
+        console.log('✅ Media library permissions already granted');
         return true;
+      }
+
+      // If status is undetermined, we should be able to ask
+      if (currentStatus.status === 'undetermined' || currentStatus.canAskAgain !== false) {
+        console.log('📋 Requesting media library permissions...');
+        
+        // Try requesting with read-only first (less intrusive)
+        let result = await MediaLibrary.requestPermissionsAsync(false);
+        console.log('Read permission result:', result);
+        
+        if (result.status === 'granted') {
+          console.log('✅ Media library permissions granted (read-only)');
+          return true;
+        }
+        
+        // If read-only failed but we can still ask, try with write permissions
+        if (result.canAskAgain !== false) {
+          console.log('📋 Trying with write permissions...');
+          result = await MediaLibrary.requestPermissionsAsync(true);
+          console.log('Write permission result:', result);
+          
+          if (result.status === 'granted') {
+            console.log('✅ Media library permissions granted (read-write)');
+            return true;
+          }
+        }
+        
+        console.warn('❌ Media library permissions denied:', result.status);
+        if (result.canAskAgain === false) {
+          console.warn('❌ Permission permanently denied - user must enable manually');
+        }
+        return false;
       } else {
-        console.warn('❌ Media library permissions denied:', status);
+        console.warn('❌ Permission permanently denied - cannot ask again');
+        console.log('User must manually enable permission in device settings');
         return false;
       }
     } catch (error) {
@@ -75,7 +169,7 @@ class LocalMusicService {
               artist: assetInfo.artist || 'Unknown Artist',
               album: assetInfo.album || 'Unknown Album',
               duration: Math.floor(asset.duration) || 0,
-              artwork: null, // Local files typically don't have artwork in MediaLibrary
+              artwork: null, // Will be populated below with custom artwork
               url: playbackUri,
               localUri: assetInfo.localUri,
               uri: assetInfo.uri || asset.uri,
@@ -110,6 +204,28 @@ class LocalMusicService {
 
       // Filter out any failed songs
       const validSongs = localSongs.filter(song => song !== null);
+      
+      // Load custom artwork for all songs
+      if (validSongs.length > 0) {
+        const songIds = validSongs.map(song => song.id);
+        const customArtwork = await artworkStorageService.getBulkArtwork(songIds);
+        
+        // Apply custom artwork to songs and generate default artwork
+        validSongs.forEach(song => {
+          if (customArtwork[song.id]) {
+            song.artwork = customArtwork[song.id];
+          }
+          // Always add default artwork data for fallback
+          song.defaultArtwork = defaultArtworkService.generateGradientForSongInfo(
+            song.title, 
+            song.artist, 
+            song.id
+          );
+        });
+        
+        console.log(`Loaded custom artwork for ${Object.keys(customArtwork).length} songs`);
+      }
+      
       console.log(`Found ${validSongs.length} local music files`);
       
       return validSongs;
@@ -186,6 +302,57 @@ class LocalMusicService {
     // Return empty array - playlists will be user-created
     // This could be extended to read .m3u or other playlist files from device
     return [];
+  }
+
+  // Custom artwork management methods
+  async setCustomArtwork(songId, imageUri) {
+    try {
+      const artworkUri = await artworkStorageService.saveArtwork(songId, imageUri);
+      console.log(`Set custom artwork for song ${songId}: ${artworkUri}`);
+      return artworkUri;
+    } catch (error) {
+      console.error('Error setting custom artwork:', error);
+      throw error;
+    }
+  }
+
+  async getCustomArtwork(songId) {
+    try {
+      return await artworkStorageService.getArtwork(songId);
+    } catch (error) {
+      console.error('Error getting custom artwork:', error);
+      return null;
+    }
+  }
+
+  async removeCustomArtwork(songId) {
+    try {
+      await artworkStorageService.removeArtwork(songId);
+      console.log(`Removed custom artwork for song ${songId}`);
+    } catch (error) {
+      console.error('Error removing custom artwork:', error);
+      throw error;
+    }
+  }
+
+  async getArtworkStorageStats() {
+    try {
+      return await artworkStorageService.getStorageStats();
+    } catch (error) {
+      console.error('Error getting artwork storage stats:', error);
+      return { songCount: 0, totalSize: 0, totalSizeMB: '0.00' };
+    }
+  }
+
+  // Get a single local song by ID (useful for refreshing after artwork change)
+  async getLocalSongById(songId) {
+    try {
+      const songs = await this.scanLocalMusic();
+      return songs.find(song => song.id === songId) || null;
+    } catch (error) {
+      console.error('Error getting local song by ID:', error);
+      return null;
+    }
   }
 }
 

@@ -23,6 +23,8 @@ import { addToRecentlyPlayed, addToFavorites, removeFromFavorites } from '../../
 import { colors } from '../../styles/colors';
 import { typography } from '../../styles/typography';
 import { designSystem } from '../../styles/designSystem';
+import EditSongModal from '../common/EditSongModal';
+import { SmallGradientArtwork } from '../common/GradientArtwork';
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +41,7 @@ const EnhancedSongCard = ({
   
   const [scaleAnim] = useState(new Animated.Value(1));
   const [isPressed, setIsPressed] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   
   if (!song || !song.id) {
     return null;
@@ -128,11 +131,10 @@ const EnhancedSongCard = ({
       >
         {showArtwork && (
           <View style={styles.artworkContainer}>
-            <Image
-              source={{
-                uri: song.artwork || 'https://via.placeholder.com/60x60?text=♪'
-              }}
-              style={[styles.artwork, getArtworkSize()]}
+            <SmallGradientArtwork 
+              song={song}
+              size={getArtworkSize().width}
+              style={styles.artwork}
             />
             {isCurrentTrack && (
               <View style={styles.playingOverlay}>
@@ -185,6 +187,20 @@ const EnhancedSongCard = ({
               />
             </TouchableOpacity>
 
+            {song.isLocal && (
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={() => setShowEditModal(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name="create-outline"
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity style={styles.moreButton}>
               <Ionicons
                 name="ellipsis-horizontal"
@@ -201,11 +217,10 @@ const EnhancedSongCard = ({
   const renderFeaturedCard = () => (
     <View style={styles.featuredCard}>
       <View style={styles.featuredArtworkContainer}>
-        <Image
-          source={{
-            uri: song.artwork || 'https://via.placeholder.com/300x300?text=♪'
-          }}
-          style={[styles.featuredArtwork, getArtworkSize()]}
+        <SmallGradientArtwork 
+          song={song}
+          size={getArtworkSize().width}
+          style={styles.featuredArtwork}
         />
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.8)']}
@@ -246,11 +261,10 @@ const EnhancedSongCard = ({
 
   const renderCompactCard = () => (
     <View style={[styles.compactCard, isCurrentTrack && styles.activeCard]}>
-      <Image
-        source={{
-          uri: song.artwork || 'https://via.placeholder.com/50x50?text=♪'
-        }}
-        style={[styles.compactArtwork, getArtworkSize()]}
+      <SmallGradientArtwork 
+        song={song}
+        size={getArtworkSize().width}
+        style={styles.compactArtwork}
       />
       
       <View style={styles.compactContent}>
@@ -297,6 +311,16 @@ const EnhancedSongCard = ({
       >
         {renderCard()}
       </TouchableOpacity>
+
+      {/* Edit Modal */}
+      <EditSongModal
+        visible={showEditModal}
+        song={song}
+        onClose={() => setShowEditModal(false)}
+        onSongUpdated={(updatedSong) => {
+          console.log('Song updated:', updatedSong.title);
+        }}
+      />
     </Animated.View>
   );
 };
@@ -409,6 +433,10 @@ const styles = StyleSheet.create({
   
   favoriteActive: {
     transform: [{ scale: 1.1 }],
+  },
+  
+  editButton: {
+    padding: designSystem.spacing.xs,
   },
   
   moreButton: {

@@ -36,6 +36,7 @@ import { audioService } from "../services/audioService";
 import { colors } from "../styles/colors";
 import { typography } from "../styles/typography";
 import { modernDesign } from "../styles/modernDesign";
+import { LargeGradientArtwork } from '../components/common/GradientArtwork';
 
 const { width, height } = Dimensions.get("window");
 
@@ -260,15 +261,10 @@ const EnhancedPlayerScreen = () => {
           </View>
           
           <View style={styles.artworkFrame}>
-            <Image
-              source={{
-                uri: currentTrack?.artwork || 'https://via.placeholder.com/300x300?text=♪'
-              }}
+            <LargeGradientArtwork 
+              song={currentTrack}
+              size={200}
               style={styles.artwork}
-              onLoad={() => {
-                // Extract dominant color logic could go here
-                setArtworkDominantColor(colors.primary);
-              }}
             />
           </View>
           

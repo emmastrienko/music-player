@@ -25,6 +25,7 @@ import { colors } from '../../styles/colors';
 import { typography } from '../../styles/typography';
 import { globalStyles } from '../../styles/globalStyles';
 import { modernDesign } from '../../styles/modernDesign';
+import { LargeGradientArtwork } from '../../components/common/GradientArtwork';
 
 const EnhancedHomeScreen = () => {
   const navigation = useNavigation();
@@ -98,11 +99,12 @@ const EnhancedHomeScreen = () => {
 
     return (
       <View style={styles.featuredSection}>
-        <ImageBackground
-          source={{ uri: featuredTrack.artwork || 'https://via.placeholder.com/400x200' }}
-          style={styles.featuredBackground}
-          imageStyle={styles.featuredBackgroundImage}
-        >
+        <View style={styles.featuredBackgroundContainer}>
+          <LargeGradientArtwork 
+            song={featuredTrack}
+            size={400}
+            style={styles.featuredBackground}
+          />
           <LinearGradient
             colors={modernDesign.gradients.overlay}
             style={styles.featuredOverlay}
@@ -146,7 +148,7 @@ const EnhancedHomeScreen = () => {
               </View>
             </BlurView>
           </LinearGradient>
-        </ImageBackground>
+        </View>
       </View>
     );
   };
